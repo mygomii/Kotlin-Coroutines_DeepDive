@@ -73,3 +73,75 @@ fun main() = runBlocking {
 - 복잡한 Rx/Callback 구조보다 **간결하고 직관적**이며 **범용성이 뛰어남**.
 - 이후 장에서는 suspend, 중단점 복원, 예외 처리, 구조화된 동시성 등에 대해 다룰 예정.
 </details>
+
+<details>
+<summary><strong>2. 시퀀스 빌더</strong></summary>
+  
+### **코루틴과 시퀀스 빌더의 관계**
+
+- **JavaScript, Python**과 같이 일부 언어는 제한된 형태의 코루틴을 지원 (예: async/await, 제너레이터).
+- 코틀린에서는 제너레이터 대신 시퀀스 빌더(sequence builder) 제공.
+- sequence { ... } 블록 내부에서 yield()를 호출하여 값을 순차적으로 반환함.
+- 이 방식은 **lazy evaluation(지연 계산)** 기반으로, 필요한 시점에만 값을 생성.
+
+### **시퀀스 빌더의 장점**
+
+- 최소한의 연산 수행
+- 무한 시퀀스 구현 가능
+- 메모리 효율적
+
+### **시퀀스 동작 방식**
+
+- yield() 호출 시 해당 위치에서 멈췄다가 다음 호출에서 이어서 실행됨.
+- main() 함수는 시퀀스를 반복문으로 순회하거나 .iterator()로 값을 하나씩 꺼냄.
+- **중단지점**을 기억하고 이어서 실행되기 때문에 효율적이고 직관적임.
+
+```kotlin
+val seq = sequence {
+    yield(1)
+    yield(2)
+    yield(3)
+}
+```
+
+```kotlin
+val seq = sequence {
+    println("Generating first")
+    yield(1)
+    println("Generating second")
+    yield(2)
+    println("Generating third")
+    yield(3)
+    println("Done")
+}
+```
+
+```kotlin
+for (num in seq) {
+    println("The next number is $num")
+}
+```
+
+### **Flow와의 비교**
+
+- sequence는 **yield를 사용한 빌더** 방식.
+- flow는 **suspend 함수로 구성**되며, 더 많은 코루틴 기능과 **중단점 재개**, 예외 처리, 병렬 처리 지원.
+- flow는 네트워크 요청 같은 suspend 작업을 포함할 수 있음:
+
+```kotlin
+fun allUsersFlow(api: UserApi): Flow<User> = flow {
+    var page = 0
+    do {
+        val users = api.takePage(page++)
+        emitAll(users)
+    } while (!users.isNullOrEmpty())
+}
+```
+
+### **결론**
+
+- 시퀀스 빌더는 가볍고 직관적인 반복/지연 계산 구현에 적합.
+- **중단점 기반으로 lazy 처리**가 가능하여 복잡한 로직을 간결하게 구성할 수 있음.
+- **suspend 함수가 필요한 경우에는 Flow 사용**을 고려해야 함.
+- 다음 장에서는 **중단(suspension)** 이 실제로 어떻게 동작하는지 다룸.
+</details>
