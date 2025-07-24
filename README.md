@@ -145,3 +145,125 @@ fun allUsersFlow(api: UserApi): Flow<User> = flow {
 - **suspend 함수가 필요한 경우에는 Flow 사용**을 고려해야 함.
 - 다음 장에서는 **중단(suspension)** 이 실제로 어떻게 동작하는지 다룸.
 </details>
+
+<details>
+<summary><strong>3. 중단은 어떻게 작동할까?</strong></summary>
+
+### **중단(suspension)**
+
+- 코루틴의 핵심 기능: 중단이 가능해야 코루틴이 의미 있음.
+- 비유: 비디오 게임의 “세이브 포인트” → 중단 시 상태 저장, 이어서 재개 가능.
+- 스레드와의 차이: 스레드는 중단/저장이 어렵지만 코루틴은 `Continuation` 객체를 통해 가능.
+- `Continuation`: 중단 지점 이후 재개에 필요한 상태 정보를 담고 있는 객체.
+
+### **중단과 재개 흐름**
+
+1. `suspendCoroutine` 함수를 사용하면 중단 가능
+2. 중단 지점에서는 아무 코드도 실행되지 않음 (After 출력 안됨)
+3. `Continuation.resume()` 호출 시 해당 지점부터 코루틴이 재개
+4. `Continuation.resumeWithException()` 으로 예외도 전달 가능
+
+- **기본 재개**
+
+```kotlin
+suspend fun main() {
+    println("Before")
+    suspendCoroutine<Unit> { cont ->
+        cont.resume(Unit) // 재개
+    }
+    println("After")
+}
+```
+
+- **스레드에서 재개**
+
+```kotlin
+suspend fun main() {
+    println("Before")
+    suspendCoroutine<Unit> { cont ->
+        thread {
+            Thread.sleep(1000)
+            cont.resume(Unit)
+        }
+    }
+    println("After")
+}
+```
+
+- **delay 함수 구현**
+
+```kotlin
+suspend fun delay(timeMillis: Long) {
+    suspendCoroutine { cont ->
+        executor.schedule({ cont.resume(Unit) }, timeMillis, TimeUnit.MILLISECONDS)
+    }
+}
+```
+
+- **값으로 재개하기**
+
+```kotlin
+val i = suspendCoroutine<Int> { cont -> cont.resume(42) } // i == 42
+val str = suspendCoroutine<String> { cont -> cont.resume("Hello") }
+val b = suspendCoroutine<Boolean> { cont -> cont.resume(true) }
+```
+
+- `resume()`은 지정한 값을 반환
+- `resumeWithException()`은 예외를 던짐
+
+---
+
+- **예외로 재개하기**
+
+```kotlin
+suspend fun main() {
+    try {
+        suspendCoroutine<Unit> { cont ->
+            cont.resumeWithException(MyException())
+        }
+    } catch (e: MyException) {
+        println("Caught!")
+    }
+}
+```
+
+- 외부 조건에 따라 실패 시 예외를 `resumeWithException`으로 처리
+- **실전 예시**
+
+```kotlin
+suspend fun requestUser(): User {
+    return suspendCancellableCoroutine { cont ->
+        requestUser(
+            onSuccess = { user -> cont.resume(user) },
+            onError = { error -> cont.resumeWithException(error) }
+        )
+    }
+}
+```
+
+- 실제 네트워크 요청/콜백 처리 시 코루틴으로 전환
+- Retrofit, Room 등은 이미 내부적으로 `suspendCancellableCoroutine` 기반으로 구현됨
+
+****잘못된 사용 예
+
+```kotlin
+var continuation: Continuation<Unit>? = null
+
+suspend fun suspendAndSetContinuation() {
+    suspendCoroutine<Unit> { cont ->
+        continuation = cont
+    }
+}
+```
+
+- ***주의**: 전역 변수에 Continuation 저장하면 메모리 누수 위험*
+
+### **요약 정리**
+
+- **중단(suspension)** 은 코루틴의 핵심이며 suspendCoroutine으로 구현됨
+- 중단된 지점의 상태는 Continuation 객체가 기억하고 있음
+- **resume()**, **resumeWithException()** 으로 재개 가능
+- delay, 네트워크 콜백, UI 응답 대기 등 다양한 비동기 흐름에 적합
+- 다음 장에서는 **코루틴 내부 구현 원리**를 다룸
+- 
+</details>
